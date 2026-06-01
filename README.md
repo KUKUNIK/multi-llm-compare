@@ -1,5 +1,9 @@
 # multi-llm-compare
 
+[![CI](https://github.com/KUKUNIK/multi-llm-compare/actions/workflows/ci.yml/badge.svg)](https://github.com/KUKUNIK/multi-llm-compare/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/multi-llm-compare.svg)](https://www.npmjs.com/package/multi-llm-compare)
+[![license](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+
 Send one prompt to multiple LLM providers in parallel and see the responses, latency, and estimated cost side by side.
 
 ```
