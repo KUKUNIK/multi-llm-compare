@@ -4,6 +4,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-03
+
+### Added
+
+- **Batch mode.** `--batch <file>` runs a JSONL file of prompts through
+  the same set of providers. Each line is either a bare string (treated
+  as the prompt) or an object with `prompt`, `id`, `system`, `maxTokens`,
+  `temperature`. Lines beginning with `#` and blank lines are skipped.
+- `--concurrency <n>` (default `1`) controls how many batch items are in
+  flight at once. Each item still fans out to every provider in parallel,
+  so the worst case is `concurrency × providers` simultaneous calls.
+- Library exports: `compareBatch`, `parseBatchJsonl`,
+  `formatBatchText` / `formatBatchMarkdown` / `formatBatchJson`, and the
+  `BatchItem` / `BatchOptions` / `BatchResult` / `BatchSummary` types.
+
+### Changed
+
+- CLI version bumped to `0.2.0`. The single-prompt path is untouched and
+  fully backwards-compatible.
+
 ## [0.1.0] - 2026-06-01
 
 ### Added

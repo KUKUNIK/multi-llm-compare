@@ -1,6 +1,6 @@
 {
   "name": "multi-llm-compare",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Send one prompt to multiple LLM providers (OpenAI, Anthropic, Google, xAI) in parallel and compare responses, latency, and cost side by side.",
   "type": "module",
   "main": "./dist/index.js",

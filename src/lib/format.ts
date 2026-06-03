@@ -1,4 +1,5 @@
 import kleur from "kleur";
+import type { BatchSummary } from "./compare.js";
 import type { CompareResult, CompareSummary } from "./types.js";
 
 export interface FormatOptions {
@@ -91,4 +92,63 @@ export function formatMarkdown(summary: CompareSummary): string {
 
 export function formatJson(summary: CompareSummary): string {
   return `${JSON.stringify(summary, null, 2)}\n`;
+}
+
+export function formatBatchText(
+  batch: BatchSummary,
+  opts: FormatOptions = {},
+): string {
+  const useColor = opts.color !== false && Boolean(process.stdout.isTTY);
+  const c = (fn: (s: string) => string, s: string) => (useColor ? fn(s) : s);
+  const lines: string[] = [];
+  for (const r of batch.results) {
+    lines.push(
+      c(
+        (s) => kleur.magenta().bold(s),
+        `\n### batch item: ${r.id} — ${truncate(r.prompt, 80)}`,
+      ),
+    );
+    lines.push(formatText(r.summary, opts).trimEnd());
+  }
+  lines.push(
+    c(
+      (s) => kleur.gray(s),
+      `\n=== batch totals: ${batch.results.length} item(s) · wall-clock ${batch.totalLatencyMs}ms · total cost ${fmtUsd(batch.totalCostUsd)} ===`,
+    ),
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+export function formatBatchMarkdown(batch: BatchSummary): string {
+  const lines: string[] = [];
+  lines.push("# multi-llm-compare batch results");
+  lines.push("");
+  lines.push(
+    `_${batch.results.length} item(s) · wall-clock ${batch.totalLatencyMs}ms · total cost ${fmtUsd(batch.totalCostUsd)}_`,
+  );
+  lines.push("");
+  lines.push("| item | prompt | wall-clock | cost |");
+  lines.push("| --- | --- | --- | --- |");
+  for (const r of batch.results) {
+    lines.push(
+      `| ${r.id} | ${escapeCell(truncate(r.prompt, 60))} | ${r.summary.totalLatencyMs}ms | ${fmtUsd(r.summary.totalCostUsd)} |`,
+    );
+  }
+  lines.push("");
+  for (const r of batch.results) {
+    lines.push(`## ${r.id}`);
+    lines.push("");
+    lines.push(`> ${truncate(r.prompt, 200)}`);
+    lines.push("");
+    lines.push(formatMarkdown(r.summary));
+  }
+  return lines.join("\n").trimEnd() + "\n";
+}
+
+export function formatBatchJson(batch: BatchSummary): string {
+  return `${JSON.stringify(batch, null, 2)}\n`;
+}
+
+function escapeCell(s: string): string {
+  return s.replace(/\|/g, "\\|").replace(/\n/g, " ");
 }

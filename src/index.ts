@@ -1,10 +1,24 @@
-export { compare } from "./lib/compare.js";
-export type { CompareOptions } from "./lib/compare.js";
+export { compare, compareBatch } from "./lib/compare.js";
+export type {
+  BatchItem,
+  BatchOptions,
+  BatchResult,
+  BatchSummary,
+  CompareOptions,
+} from "./lib/compare.js";
+export { parseBatchJsonl } from "./lib/batch.js";
 export { createProvider, parseTarget } from "./lib/registry.js";
 export type { RegistryConfig } from "./lib/registry.js";
 export { estimateCost } from "./lib/pricing.js";
 export type { PricingEntry } from "./lib/pricing.js";
-export { formatJson, formatMarkdown, formatText } from "./lib/format.js";
+export {
+  formatBatchJson,
+  formatBatchMarkdown,
+  formatBatchText,
+  formatJson,
+  formatMarkdown,
+  formatText,
+} from "./lib/format.js";
 export type {
   CompareMessage,
   CompareRequest,

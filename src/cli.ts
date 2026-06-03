@@ -1,12 +1,20 @@
 import { readFile } from "node:fs/promises";
 import { Command } from "commander";
 import kleur from "kleur";
-import { compare } from "./lib/compare.js";
-import { formatJson, formatMarkdown, formatText } from "./lib/format.js";
+import { parseBatchJsonl } from "./lib/batch.js";
+import { compare, compareBatch } from "./lib/compare.js";
+import {
+  formatBatchJson,
+  formatBatchMarkdown,
+  formatBatchText,
+  formatJson,
+  formatMarkdown,
+  formatText,
+} from "./lib/format.js";
 import { parseTarget } from "./lib/registry.js";
 import type { CompareMessage } from "./lib/types.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 async function readStdinIfPiped(): Promise<string> {
   if (process.stdin.isTTY) return "";
@@ -39,6 +47,15 @@ async function main(): Promise<void> {
     .option("--format <fmt>", "output: text | markdown | json", "text")
     .option("--full", "do not truncate text responses in text format")
     .option("--no-color", "disable ANSI colors")
+    .option(
+      "--batch <path>",
+      "JSONL file: one prompt per line (string, or {prompt, system?, id?, maxTokens?, temperature?})",
+    )
+    .option(
+      "--concurrency <n>",
+      "for --batch, how many items to run in parallel (defaults to 1; each item still fans out to every provider in parallel)",
+      "1",
+    )
     .action(
       async (
         promptArg: string | undefined,
@@ -53,6 +70,8 @@ async function main(): Promise<void> {
           format: string;
           full?: boolean;
           color: boolean;
+          batch?: string;
+          concurrency: string;
         },
       ) => {
         if (opts.provider.length === 0) {
@@ -60,10 +79,59 @@ async function main(): Promise<void> {
           return;
         }
         const targets = opts.provider.map(parseTarget);
+        const maxTokens = Number.parseInt(opts.maxTokens, 10);
+        const temperature = opts.temperature
+          ? Number.parseFloat(opts.temperature)
+          : undefined;
+        const timeoutMs = Number.parseInt(opts.timeout, 10);
+
+        if (opts.batch) {
+          const concurrency = Number.parseInt(opts.concurrency, 10);
+          if (Number.isNaN(concurrency) || concurrency < 1) {
+            fatal(`bad --concurrency: ${opts.concurrency} (expected a positive integer)`);
+            return;
+          }
+          const raw = await readFile(opts.batch, "utf8");
+          const items = parseBatchJsonl(raw);
+          if (items.length === 0) {
+            fatal(`batch file "${opts.batch}" has no items`);
+            return;
+          }
+          const systemPrompt = await resolveSystem(opts.system, opts.systemFile);
+          if (systemPrompt) {
+            for (const it of items) {
+              if (!it.system) it.system = systemPrompt;
+            }
+          }
+          const batch = await compareBatch({
+            targets,
+            items,
+            concurrency,
+            defaultRequest: { maxTokens, temperature, timeoutMs },
+          });
+          if (opts.format === "json") {
+            process.stdout.write(formatBatchJson(batch));
+          } else if (opts.format === "markdown") {
+            process.stdout.write(formatBatchMarkdown(batch));
+          } else {
+            process.stdout.write(
+              formatBatchText(batch, {
+                color: opts.color,
+                showFullText: opts.full,
+              }),
+            );
+          }
+          const anyError = batch.results.some((r) =>
+            r.summary.results.some((x) => x.status === "error"),
+          );
+          process.exitCode = anyError ? 1 : 0;
+          return;
+        }
+
         const userPrompt = await resolveUserPrompt(promptArg, opts.promptFile);
         const systemPrompt = await resolveSystem(opts.system, opts.systemFile);
         if (!userPrompt) {
-          fatal("no user prompt provided (positional arg, --prompt-file, or stdin)");
+          fatal("no user prompt provided (positional arg, --prompt-file, --batch, or stdin)");
           return;
         }
 
@@ -73,14 +141,7 @@ async function main(): Promise<void> {
 
         const summary = await compare({
           targets,
-          request: {
-            messages,
-            maxTokens: Number.parseInt(opts.maxTokens, 10),
-            temperature: opts.temperature
-              ? Number.parseFloat(opts.temperature)
-              : undefined,
-            timeoutMs: Number.parseInt(opts.timeout, 10),
-          },
+          request: { messages, maxTokens, temperature, timeoutMs },
         });
 
         if (opts.format === "json") {

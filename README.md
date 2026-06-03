@@ -26,7 +26,7 @@ $ llm-compare "Write a haiku about TypeScript." \
 
 Supports **OpenAI**, **Anthropic**, **Google Gemini**, and **xAI Grok**. Works with their public APIs directly — no SDK dependencies, no proxy layer.
 
-> Status: `0.1.0` — usable, but the CLI flags and JSON shape may shift before `1.0`.
+> Status: `0.2.0` — usable, but the CLI flags and JSON shape may shift before `1.0`.
 
 ## Why
 
@@ -75,6 +75,8 @@ llm-compare "<prompt>" \
   [--format text|markdown|json]
   [--full]                          # don't truncate text output
   [--no-color]
+  [--batch prompts.jsonl]           # run many prompts through the same panel
+  [--concurrency 1]                 # how many batch items run in parallel
 ```
 
 Provider specs look like `vendor:model-id`. Examples:
@@ -108,6 +110,34 @@ llm-compare "extract the action items" \
   -p google:gemini-1.5-flash \
   --format json | jq '.results[] | {model: .target.modelId, text}'
 ```
+
+### Batch mode
+
+If you want to run the same set of models against **many prompts** —
+a regression test, a small eval set, a "how does each model answer
+my top 20 support tickets" — point `--batch` at a JSON-Lines file:
+
+```jsonl
+# eval.jsonl  (lines starting with # are ignored)
+{"id": "math-1", "prompt": "What is 17 * 23?"}
+{"id": "code-1", "prompt": "Refactor this loop to use map.", "system": "Reply with code only."}
+"a bare string works too — it becomes the prompt"
+```
+
+```bash
+llm-compare \
+  -p openai:gpt-4o-mini \
+  -p anthropic:claude-3-5-haiku \
+  --batch eval.jsonl \
+  --concurrency 2 \
+  --format markdown > eval-report.md
+```
+
+Each line is one item. Each item fans out to every `-p` provider, so the
+underlying provider call count is `items × providers`. `--concurrency`
+controls how many items are in flight at once; default `1` keeps it
+provider-friendly. The output is one section per item plus a totals
+footer.
 
 ## Library usage
 
