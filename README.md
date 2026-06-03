@@ -32,7 +32,7 @@ Supports **OpenAI**, **Anthropic**, **Google Gemini**, and **xAI Grok**. Works w
 
 You're picking between models. The right answer almost always depends on **your** workload, not on benchmarks. So you want to throw your actual prompt at three or four candidates, line up the responses, and decide.
 
-`multi-llm-compare` does exactly that. No SDK, no framework, no chat UI to log into. One CLI command, one library function.
+`multi-llm-compare` does exactly that. No SDK, no framework, no chat UI to log into. One CLI command, one library function. For larger evaluations — "how does each model handle my top 20 support tickets?" — point `--batch` at a JSON-Lines file and get one report covering every prompt × provider pair (see [Batch mode](#batch-mode)).
 
 ## Install
 
