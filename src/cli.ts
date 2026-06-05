@@ -56,6 +56,11 @@ async function main(): Promise<void> {
       "for --batch, how many items to run in parallel (defaults to 1; each item still fans out to every provider in parallel)",
       "1",
     )
+    .option(
+      "--retries <n>",
+      "retry transient provider failures per target (exponential backoff, base 100ms). 0 = no retry",
+      "0",
+    )
     .action(
       async (
         promptArg: string | undefined,
@@ -72,6 +77,7 @@ async function main(): Promise<void> {
           color: boolean;
           batch?: string;
           concurrency: string;
+          retries: string;
         },
       ) => {
         if (opts.provider.length === 0) {
@@ -84,6 +90,11 @@ async function main(): Promise<void> {
           ? Number.parseFloat(opts.temperature)
           : undefined;
         const timeoutMs = Number.parseInt(opts.timeout, 10);
+        const retries = Number.parseInt(opts.retries, 10);
+        if (Number.isNaN(retries) || retries < 0) {
+          fatal(`bad --retries: ${opts.retries} (expected a non-negative integer)`);
+          return;
+        }
 
         if (opts.batch) {
           const concurrency = Number.parseInt(opts.concurrency, 10);
@@ -108,6 +119,7 @@ async function main(): Promise<void> {
             items,
             concurrency,
             defaultRequest: { maxTokens, temperature, timeoutMs },
+            retries,
           });
           if (opts.format === "json") {
             process.stdout.write(formatBatchJson(batch));
@@ -142,6 +154,7 @@ async function main(): Promise<void> {
         const summary = await compare({
           targets,
           request: { messages, maxTokens, temperature, timeoutMs },
+          retries,
         });
 
         if (opts.format === "json") {

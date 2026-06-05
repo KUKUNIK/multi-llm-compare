@@ -162,6 +162,92 @@ describe("compare", () => {
     }
   });
 
+  it("retries transient failures and returns ok when one succeeds", async () => {
+    let attempts = 0;
+    const flakyFetch: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("api.openai.com")) {
+        attempts++;
+        if (attempts < 3) {
+          return new Response(JSON.stringify({ error: { message: "boom" } }), {
+            status: 500,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "third time lucky" } }],
+            usage: { prompt_tokens: 1, completion_tokens: 1 },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response("not mocked", { status: 500 });
+    };
+
+    const summary = await compare({
+      targets: [{ vendor: "openai", modelId: "gpt-4o" }],
+      request: { messages: [{ role: "user", content: "hi" }] },
+      registry: { fetchImpl: flakyFetch, env: { OPENAI_API_KEY: "t" } },
+      retries: 3,
+      retryBaseMs: 1,
+    });
+
+    expect(attempts).toBe(3);
+    expect(summary.results[0]?.status).toBe("ok");
+    if (summary.results[0]?.status === "ok") {
+      expect(summary.results[0].text).toBe("third time lucky");
+    }
+  });
+
+  it("gives up after exhausting retries and reports attempt count", async () => {
+    let attempts = 0;
+    const alwaysFails: typeof fetch = async (input) => {
+      if (String(input).includes("api.openai.com")) attempts++;
+      return new Response(JSON.stringify({ error: { message: "still bad" } }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      });
+    };
+
+    const summary = await compare({
+      targets: [{ vendor: "openai", modelId: "gpt-4o" }],
+      request: { messages: [{ role: "user", content: "hi" }] },
+      registry: { fetchImpl: alwaysFails, env: { OPENAI_API_KEY: "t" } },
+      retries: 2,
+      retryBaseMs: 1,
+    });
+
+    expect(attempts).toBe(3);
+    expect(summary.results[0]?.status).toBe("error");
+    if (summary.results[0]?.status === "error") {
+      expect(summary.results[0].errorMessage).toMatch(/after 3 attempts/);
+    }
+  });
+
+  it("does not retry when retries=0 (default)", async () => {
+    let attempts = 0;
+    const failOnce: typeof fetch = async (input) => {
+      if (String(input).includes("api.openai.com")) attempts++;
+      return new Response(JSON.stringify({ error: { message: "no" } }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      });
+    };
+
+    const summary = await compare({
+      targets: [{ vendor: "openai", modelId: "gpt-4o" }],
+      request: { messages: [{ role: "user", content: "hi" }] },
+      registry: { fetchImpl: failOnce, env: { OPENAI_API_KEY: "t" } },
+    });
+
+    expect(attempts).toBe(1);
+    expect(summary.results[0]?.status).toBe("error");
+    if (summary.results[0]?.status === "error") {
+      expect(summary.results[0].errorMessage).not.toMatch(/attempts/);
+    }
+  });
+
   it("throws when API key env var is missing", async () => {
     await expect(
       compare({
