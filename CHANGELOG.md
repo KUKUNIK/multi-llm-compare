@@ -4,6 +4,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- `--retries <n>` (CLI) / `retries`, `retryBaseMs` (library) for per-target
+  retry on transient provider failures. Exponential backoff
+  `retryBaseMs * 2^attempt`, default `retryBaseMs = 100`. After exhausting
+  the budget the error message is suffixed with `(after K attempts)`.
+- Tests covering successful retry, exhausted retry, and default `retries=0`
+  no-retry behaviour.
+
 ## [0.2.0] - 2026-06-03
 
 ### Added
