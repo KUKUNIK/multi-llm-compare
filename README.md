@@ -77,6 +77,7 @@ llm-compare "<prompt>" \
   [--no-color]
   [--batch prompts.jsonl]           # run many prompts through the same panel
   [--concurrency 1]                 # how many batch items run in parallel
+  [--retries 0]                     # retry transient provider failures
 ```
 
 Provider specs look like `vendor:model-id`. Examples:
@@ -138,6 +139,25 @@ underlying provider call count is `items × providers`. `--concurrency`
 controls how many items are in flight at once; default `1` keeps it
 provider-friendly. The output is one section per item plus a totals
 footer.
+
+### Retrying transient failures
+
+Provider APIs occasionally return 5xx or rate-limit errors that resolve
+on a retry. `--retries N` runs each per-target call up to `N + 1` times
+with exponential backoff (`100ms * 2^attempt`):
+
+```bash
+# Survive the odd Anthropic 529 during a long batch run
+llm-compare \
+  -p anthropic:claude-3-5-sonnet \
+  -p openai:gpt-4o \
+  --batch eval.jsonl \
+  --retries 3
+```
+
+A target that exhausts its retries still reports as `error`, with the
+final upstream message followed by `(after K attempts)`. Other targets
+in the same fan-out are unaffected.
 
 ## Library usage
 
